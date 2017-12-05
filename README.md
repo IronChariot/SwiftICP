@@ -1,7 +1,7 @@
 # SwiftICP
 Simple ICP Algorithm implemented in Swift with as few dependencies as possible
 
-Uses KDTree via CocoaPods and otherwise no external libraries.
+Uses KDTree (https://github.com/Bersaelor/KDTree).
 
 Based on code and information from:
 
