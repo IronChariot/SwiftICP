@@ -90,10 +90,10 @@ class ViewController: UIViewController {
         
         // Create a transformed point cloud (some degrees rotated around X axis,
         // translated by some units in x, y and z directions respectively)
-        let xRot = (10 / 360) * 2 * Float.pi
-        let xTrans: Float = 3.0
+        let xRot = (0 / 360) * 2 * Float.pi
+        let xTrans: Float = 1.0
         let yTrans: Float = 1.0
-        let zTrans: Float = 5.0
+        let zTrans: Float = 0.5
         
         var transformMatrix = GLKMatrix4Make(1.0, 0.0, 0.0, 0.0,
                                              0.0, 1.0, 0.0, 0.0,
