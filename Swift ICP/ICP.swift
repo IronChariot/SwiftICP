@@ -12,23 +12,56 @@ import GLKit
 
 class ICP {
     
-    func closestPoints(pointSet1Tree: KDTree<GLKVector3>, pointSet2: [GLKVector3]) -> (trimmedSet2: [GLKVector3], pairedPoints: [GLKVector3], error: Double) {
+    var tree: KDTree<GLKVector3>
+    var points: [GLKVector3]
+    var points2: [GLKVector3]
+    var zDistThreshold: Double = 0.15
+    var totalTransform: GLKMatrix4 = GLKMatrix4Identity
+    
+    init(_ basePointCloud: [GLKVector3], _ secondPointCloud: [GLKVector3], zDiffThreshold: Double) {
+        // Load first point cloud (base) into KDTree, save both point clouds
+        tree = KDTree(values: basePointCloud)
+        points = basePointCloud
+        points2 = secondPointCloud
+        zDistThreshold = zDiffThreshold
+    }
+    
+    func iterate(maxIterations: Int, minErrorChange: Double) -> GLKMatrix4 {
+        // Does the iterations of ICP until we've done enough or have a small enough error change
+        var trimmedPoints = [GLKVector3]()
+        var trimmedPoints2 = [GLKVector3]()
+        var error: Double = 99999.0
+        var lastError: Double = Double.greatestFiniteMagnitude
+        for _ in 0..<maxIterations {
+            (trimmedPoints2, trimmedPoints, error) = closestPoints(pointSet2: points2)
+            print("Error: \(error)")
+            points2 = icpStep(pointSet1: trimmedPoints, pointSet2: trimmedPoints2, fullPointSet2: points2)
+            if abs(lastError - error) < minErrorChange {
+                break
+            }
+            lastError = error
+        }
+        
+        return totalTransform
+    }
+    
+    func closestPoints(pointSet2: [GLKVector3]) -> (trimmedSet2: [GLKVector3], pairedPoints: [GLKVector3], error: Double) {
         // For each point in second point cloud, find closest point in first cloud tree
         // TODO: Also consider something to find 'unique' pairs
         var pairedPoints = [GLKVector3]()
         var trimmedSet2 = [GLKVector3]()
         var totalError = 0.0
         for point in pointSet2 {
-            let closest = pointSet1Tree.nearest(toElement: point)
+            let closest = tree.nearest(toElement: point)
             let xyDist = xyDistance(point1: closest!, point2: point)
             let distance = (closest?.squaredDistance(to: point))!.squareRoot()
-            if abs(distance - xyDist) > 0.15 {
+            if abs(distance - xyDist) > zDistThreshold {
                 totalError += distance
                 pairedPoints.append(closest!)
                 trimmedSet2.append(point)
             }
         }
-        print("Length of trimmed set2: \(trimmedSet2.count)")
+//        print("Length of trimmed set2: \(trimmedSet2.count)")
         let error = totalError / Double(pointSet2.count)
         
         return (trimmedSet2, pairedPoints, error)
@@ -60,15 +93,18 @@ class ICP {
         guessedTransformMatrix.m32 = Float(T[2])
         
         // Rotation
-//        guessedTransformMatrix.m00 = Float(R[0])
-//        guessedTransformMatrix.m01 = Float(R[3])
-//        guessedTransformMatrix.m02 = Float(R[6])
-//        guessedTransformMatrix.m10 = Float(R[1])
-//        guessedTransformMatrix.m11 = Float(R[4])
-//        guessedTransformMatrix.m12 = Float(R[7])
-//        guessedTransformMatrix.m20 = Float(R[2])
-//        guessedTransformMatrix.m21 = Float(R[5])
-//        guessedTransformMatrix.m22 = Float(R[8])
+        guessedTransformMatrix.m00 = Float(R[0])
+        guessedTransformMatrix.m01 = Float(R[3])
+        guessedTransformMatrix.m02 = Float(R[6])
+        guessedTransformMatrix.m10 = Float(R[1])
+        guessedTransformMatrix.m11 = Float(R[4])
+        guessedTransformMatrix.m12 = Float(R[7])
+        guessedTransformMatrix.m20 = Float(R[2])
+        guessedTransformMatrix.m21 = Float(R[5])
+        guessedTransformMatrix.m22 = Float(R[8])
+        
+        // Update totaltransform matrix
+        totalTransform = GLKMatrix4Multiply(guessedTransformMatrix, totalTransform)
 
         // Apply rotation/translation to second cloud (full), return
         var pointSet2Transformed = [GLKVector3]()

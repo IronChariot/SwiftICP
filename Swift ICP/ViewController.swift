@@ -19,6 +19,7 @@ class ViewController: UIViewController {
     var cameraNode: SCNNode!
     
     let maxIter = 20
+    let minErrorChange = 0.0001
     
     func setupView() {
         scnView = self.view as! SCNView
@@ -37,8 +38,16 @@ class ViewController: UIViewController {
         scnView.allowsCameraControl = true
     }
     
-    func createPoint(_ point: GLKVector3, color: UIColor) {
-        let pointBall = SCNSphere(radius: 0.1)
+    func createPoint(_ point: GLKVector3, _ color: UIColor, showFraction: Double, size: Double) {
+        // Make only a fraction of points show up... Stops SceneKit from getting too slow
+        assert(showFraction <= 1.0, "Fractions shouldn't go above 1!")
+        let willShow = drand48()
+        if willShow > showFraction {
+            return
+        }
+        
+        // Actually putting a point in the scene
+        let pointBall = SCNSphere(radius: CGFloat(size))
         pointBall.firstMaterial?.diffuse.contents = color
         pointBall.firstMaterial?.specular.contents = UIColor.white
         let pointNode = SCNNode(geometry: pointBall)
@@ -54,6 +63,11 @@ class ViewController: UIViewController {
         setupScene()
         setupCamera()
         
+        simpleExample()
+//        fileExample()
+    }
+    
+    func simpleExample() {
         // Create example point cloud (flat points)
         var points = [GLKVector3]()
         for i in 0...99 {
@@ -70,7 +84,7 @@ class ViewController: UIViewController {
                 let noise = ((Float(arc4random_uniform(10000)) / 10000) * 0.2) - 0.1
                 let point = GLKVector3Make(Float(i)/10.0, Float(j)/10.0, z + noise)
                 points.append(point)
-                createPoint(point, color: UIColor.cyan)
+                createPoint(point, UIColor.cyan, showFraction: 0.1, size: 0.05)
             }
         }
         
@@ -122,32 +136,82 @@ class ViewController: UIViewController {
 //            createPoint(newPoint, color: UIColor.red)
         }
         
-        // Load first point cloud (base) into KDTree
-        let tree: KDTree<GLKVector3> = KDTree(values: points)
+        let ICPInstance = ICP(points, points2, zDiffThreshold: -1.0)
+        let finalTransform = ICPInstance.iterate(maxIterations: maxIter, minErrorChange: minErrorChange)
         
-        // First run: find minimum distance between points
-        var minDist = 99999999.9
+        var finalPoints2 = [GLKVector3]()
         for point in points2 {
-            let closest = tree.nearest(toElement: point)
-            let dist = closest?.squaredDistance(to: point).squareRoot()
-            if dist! < minDist { minDist = dist! }
+            let newVector = GLKMatrix4MultiplyVector4(finalTransform, GLKVector4MakeWithVector3(point, 1))
+            let newPoint = GLKVector3Make(newVector.x, newVector.y, newVector.z)
+            finalPoints2.append(newPoint)
+            createPoint(newPoint, UIColor.green, showFraction: 0.1, size: 0.05)
         }
-        print(minDist)
+    }
+    
+    func fileExample() {
+        let points = getPointCloudFromFile(fileName: "realPointCloud2.csv", subsample: 10000)
+        let points2 = getPointCloudFromFile(fileName: "realPointCloud4.csv", subsample: 10000)
         
-        let ICPInstance = ICP()
+        let ICPInstance = ICP(points, points2, zDiffThreshold: -1.0)
+        let finalTransform = ICPInstance.iterate(maxIterations: maxIter, minErrorChange: 0.0)
         
-        var error: Double = 9999.0
-//        var lastError: Double = Double.greatestFiniteMagnitude
-        for _ in 0..<maxIter {
-            var trimmedPoints2 = [GLKVector3]()
-            (trimmedPoints2, points, error) = ICPInstance.closestPoints(pointSet1Tree: tree, pointSet2: points2)
-            print("Error: \(error)")
-            points2 = ICPInstance.icpStep(pointSet1: points, pointSet2: trimmedPoints2, fullPointSet2: points2)
-//            lastError = error
+        for point in points {
+            createPoint(point, UIColor.cyan, showFraction: 0.1, size: 0.005)
         }
+        var finalPoints2 = [GLKVector3]()
         for point in points2 {
-            createPoint(point, color: UIColor.green)
+            let newVector = GLKMatrix4MultiplyVector4(finalTransform, GLKVector4MakeWithVector3(point, 1))
+            let newPoint = GLKVector3Make(newVector.x, newVector.y, newVector.z)
+            finalPoints2.append(newPoint)
+            createPoint(newPoint, UIColor.green, showFraction: 0.1, size: 0.005)
         }
+    }
+    
+    func getPointCloudFromFile(fileName: String, subsample: Int) -> [GLKVector3] {
+        // Extract an x, y, z point cloud from file, and subsample a maximum of 'subsample' points
+        
+        var pointCloud = [GLKVector3]()
+        
+        if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let fileUrl = dir.appendingPathComponent(fileName)
+            var text = ""
+            
+            do {
+                text = try String(contentsOf: fileUrl, encoding: .utf8)
+            } catch {
+                print("Could not read from file '\(fileName)'")
+            }
+            
+            var lines = text.components(separatedBy: .newlines)
+            if lines[0].hasPrefix("x,") {
+                lines.remove(at: 0)
+            }
+            
+            let numberOfPoints = lines.count
+            var fraction = 1.0
+            if numberOfPoints > subsample {
+                fraction = Double(subsample) / Double(numberOfPoints)
+            }
+            
+            for line in lines {
+                let willInclude = drand48()
+                if willInclude > fraction {
+                    continue // Skip to next line
+                }
+                let coords = line.components(separatedBy: ",")
+                if coords.count < 3 {
+                    // End of file
+                    break
+                }
+                let x = Float(coords[0])
+                let y = Float(coords[1])
+                let z = Float(coords[2])
+                let vec = GLKVector3Make(x!, y!, z!)
+                pointCloud.append(vec)
+            }
+        }
+        
+        return pointCloud
     }
 }
 
