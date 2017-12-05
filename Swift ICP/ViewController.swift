@@ -18,6 +18,8 @@ class ViewController: UIViewController {
     var scnScene: SCNScene!
     var cameraNode: SCNNode!
     
+    let maxIter = 20
+    
     func setupView() {
         scnView = self.view as! SCNView
     }
@@ -52,8 +54,6 @@ class ViewController: UIViewController {
         setupScene()
         setupCamera()
         
-        let maxIter = 20
-        
         // Create example point cloud (flat points)
         var points = [GLKVector3]()
         for i in 0...99 {
@@ -66,7 +66,9 @@ class ViewController: UIViewController {
                     z = sphereSurf.squareRoot() - 1.5
                     if z < 0 { z = 0 }
                 }
-                let point = GLKVector3Make(Float(i)/10.0, Float(j)/10.0, z)
+                // Add a bit of noise to Z, between -0.1 and 0.1
+                let noise = ((Float(arc4random_uniform(10000)) / 10000) * 0.2) - 0.1
+                let point = GLKVector3Make(Float(i)/10.0, Float(j)/10.0, z + noise)
                 points.append(point)
                 createPoint(point, color: UIColor.cyan)
             }
@@ -83,7 +85,9 @@ class ViewController: UIViewController {
                     z = sphereSurf.squareRoot() - 1.5
                     if z < 0 { z = 0 }
                 }
-                let point = GLKVector3Make(Float(i)/10.0, Float(j)/10.0, z)
+                // Add a bit of noise to Z, between -0.1 and 0.1
+                let noise = ((Float(arc4random_uniform(10000)) / 10000) * 0.2) - 0.1
+                let point = GLKVector3Make(Float(i)/10.0, Float(j)/10.0, z + noise)
                 pointsOffset.append(point)
             }
         }
