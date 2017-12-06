@@ -72,8 +72,8 @@ class ViewController: UIViewController {
         var points = [GLKVector3]()
         for i in 0...99 {
             for j in 0...99 {
-                let x = (Float(i) / 10.0) - 3.0
-                let y = (Float(j) / 10.0) - 7.0
+                let x = (Float(i) / 10.0) - 6.0
+                let y = (Float(j) / 10.0) - 6.0
                 var z: Float = 0.0
                 let sphereSurf = (9 - (x * x) - (y * y))
                 if sphereSurf > 0 {
@@ -133,14 +133,14 @@ class ViewController: UIViewController {
             let newVector = GLKMatrix4MultiplyVector4(transformMatrix, GLKVector4MakeWithVector3(point, 1))
             let newPoint = GLKVector3Make(newVector.x, newVector.y, newVector.z)
             points2.append(newPoint)
-//            createPoint(newPoint, color: UIColor.red)
         }
         
-        let ICPInstance = ICP(points, points2, zDiffThreshold: -1.0)
-        let finalTransform = ICPInstance.iterate(maxIterations: maxIter, minErrorChange: minErrorChange)
+        let ICPInstance = ICP(points, points2)
+        let finalTransform = ICPInstance.iterate(maxIterations: 100, minErrorChange: 0.0)
         
         var finalPoints2 = [GLKVector3]()
         for point in points2 {
+            createPoint(point, .red, showFraction: 0.1, size: 0.03)
             let newVector = GLKMatrix4MultiplyVector4(finalTransform, GLKVector4MakeWithVector3(point, 1))
             let newPoint = GLKVector3Make(newVector.x, newVector.y, newVector.z)
             finalPoints2.append(newPoint)
@@ -149,21 +149,22 @@ class ViewController: UIViewController {
     }
     
     func fileExample() {
-        let points = getPointCloudFromFile(fileName: "realPointCloud2.csv", subsample: 10000)
-        let points2 = getPointCloudFromFile(fileName: "realPointCloud4.csv", subsample: 10000)
+        let points = getPointCloudFromFile(fileName: "realPointCloud0.csv", subsample: 30000)
+        let points2 = getPointCloudFromFile(fileName: "realPointCloud1.csv", subsample: 30000)
         
-        let ICPInstance = ICP(points, points2, zDiffThreshold: -1.0)
+        let ICPInstance = ICP(points, points2)
         let finalTransform = ICPInstance.iterate(maxIterations: maxIter, minErrorChange: 0.0)
         
         for point in points {
-            createPoint(point, UIColor.cyan, showFraction: 0.1, size: 0.005)
+            createPoint(point, UIColor.blue, showFraction: 0.1, size: 0.003)
         }
         var finalPoints2 = [GLKVector3]()
         for point in points2 {
+            createPoint(point, UIColor.red, showFraction: 0.1, size: 0.002)
             let newVector = GLKMatrix4MultiplyVector4(finalTransform, GLKVector4MakeWithVector3(point, 1))
             let newPoint = GLKVector3Make(newVector.x, newVector.y, newVector.z)
             finalPoints2.append(newPoint)
-            createPoint(newPoint, UIColor.green, showFraction: 0.1, size: 0.005)
+            createPoint(newPoint, UIColor.green, showFraction: 0.1, size: 0.003)
         }
     }
     
